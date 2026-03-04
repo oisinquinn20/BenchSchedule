@@ -14,6 +14,7 @@ export interface WeeklyPlanDay {
 export interface WeeklyPlan {
   id?: string;
   week_start: string; // YYYY-MM-DD (Monday)
+  week_overview?: string;
   days: Record<string, WeeklyPlanDay>; // keys: YYYY-MM-DD
 }
 
@@ -28,7 +29,7 @@ export class PlannerService {
     return this.http.get<WeeklyPlan>(this.baseUrl, { params });
   }
 
-  saveWeek(weekStart: string, days: WeeklyPlan['days']): Observable<WeeklyPlan> {
-    return this.http.put<WeeklyPlan>(`${this.baseUrl}/${weekStart}`, { days });
+  saveWeek(weekStart: string, days: WeeklyPlan['days'], week_overview: string): Observable<WeeklyPlan> {
+  return this.http.put<WeeklyPlan>(`${this.baseUrl}/${weekStart}`, { days, week_overview });
   }
 }

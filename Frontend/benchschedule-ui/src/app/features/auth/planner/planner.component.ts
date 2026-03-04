@@ -76,6 +76,14 @@ import { PlannerService, WeeklyPlan, WeeklyPlanDay } from './planner.service';
               </div>
             </div>
 
+            <div class="overview" *ngIf="plan">
+              <div class="overview-title">Week overview</div>
+              <textarea
+                [(ngModel)]="weekOverviewInput"
+                placeholder="Add a detailed overview for the week…"
+              ></textarea>
+            </div>
+
             <div class="status" *ngIf="loading">Loading…</div>
           </section>
 
@@ -385,6 +393,23 @@ import { PlannerService, WeeklyPlan, WeeklyPlanDay } from './planner.service';
   .bottombar { height:56px; display:flex; align-items:center; justify-content:center; background:#fff; border-top:1px solid rgba(0,0,0,0.08); }
   .center { font-weight:700; color:#ea580c; }
 
+  .overview { margin-top: 14px; border-top: 1px solid rgba(0,0,0,0.06); padding-top: 14px; }
+  .overview-title { font-weight: 900; color: #111827; margin-bottom: 8px; }
+  .overview textarea {
+    width: 100%;
+    min-height: 220px;
+    border: 1px solid rgba(0,0,0,0.12);
+    border-radius: 12px;
+    padding: 12px;
+    font: inherit;
+    outline: none;
+    resize: vertical;
+  }
+  .overview textarea:focus {
+    border-color:#ea580c;
+    box-shadow: 0 0 0 3px rgba(234,88,12,.15);
+  }
+
   @media (max-width: 1100px) {
     .week-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   }
@@ -403,6 +428,7 @@ export class PlannerComponent {
 
   currentWeekStart = this.getMonday(new Date());
   weekDays: Date[] = this.buildWeekDays(this.currentWeekStart);
+  weekOverviewInput = '';
 
   plan: WeeklyPlan | null = null;
   loading = false;
@@ -522,7 +548,7 @@ export class PlannerComponent {
     this.loading = true;
     this.error = '';
 
-    this.plannerService.saveWeek(weekStart, days).subscribe({
+    this.plannerService.saveWeek(weekStart, days, this.weekOverviewInput.trim()).subscribe({
       next: (saved) => {
         const normalized: Record<string, WeeklyPlanDay> = {};
         for (const d of this.weekDays) {
@@ -530,6 +556,7 @@ export class PlannerComponent {
           normalized[key] = saved.days?.[key] ?? this.defaultDay();
         }
         this.plan = { ...saved, week_start: weekStart, days: normalized };
+        this.weekOverviewInput = saved.week_overview ?? this.weekOverviewInput;
         this.loading = false;
 
         // keep details panel in sync
@@ -557,6 +584,7 @@ export class PlannerComponent {
           days[key] = p.days?.[key] ?? this.defaultDay();
         }
         this.plan = { ...p, week_start: weekStart, days };
+        this.weekOverviewInput = p.week_overview ?? '';
         this.loading = false;
       },
       error: (e) => {
@@ -564,6 +592,7 @@ export class PlannerComponent {
         const days: Record<string, WeeklyPlanDay> = {};
         for (const d of this.weekDays) days[this.dayKey(d)] = this.defaultDay();
         this.plan = { week_start: weekStart, days };
+        this.weekOverviewInput = '';
         this.loading = false;
         this.error = 'Failed to load week';
       }

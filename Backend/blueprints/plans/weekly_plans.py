@@ -15,6 +15,7 @@ def _plan_to_json(doc):
     return {
         "id": str(doc["_id"]),
         "week_start": doc.get("week_start"),
+        "week_overview": doc.get("week_overview", ""),
         "days": doc.get("days"),
     }
 
@@ -30,6 +31,7 @@ def get_weekly_plan():
     if not doc:
         return make_response(jsonify({
             "week_start": week_start,
+            "week_overview": "",
             "days": {}
         }), 200)
 
@@ -42,6 +44,7 @@ def get_weekly_plan():
 def save_weekly_plan(week_start):
     data = request.get_json(silent=True) or {}
     days = data.get("days")
+    week_overview = (data.get("week_overview") or "").strip()
 
     if not isinstance(days, dict):
         return make_response(jsonify({"message": "days must be an object"}), 400)
@@ -89,6 +92,7 @@ def save_weekly_plan(week_start):
 
     doc = {
         "week_start": week_start,
+        "week_overview": week_overview,
         "days": days,
     }
 
