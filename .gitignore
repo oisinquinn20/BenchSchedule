@@ -1,0 +1,12 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+
+# Env
+.env
+
+# Angular
+Frontend/benchschedule-ui/node_modules/
+Frontend/benchschedule-ui/.angular/
+Frontend/benchschedule-ui/dist/
