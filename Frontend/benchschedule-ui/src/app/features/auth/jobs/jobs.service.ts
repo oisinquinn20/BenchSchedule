@@ -7,6 +7,7 @@ export type JobStatus = 'planned' | 'in_progress' | 'completed' | 'on_hold';
 export interface Job {
   id: string;
   client_id: string | null;
+  project_id?: string | null;
   title: string;
   description: string;
   estimated_start: string;
@@ -16,6 +17,7 @@ export interface Job {
 
 export type JobCreate = {
   client_id: string;
+  project_id?: string;
   title: string;
   description?: string;
   estimated_start?: string;
@@ -29,9 +31,10 @@ export type JobUpdate = Partial<JobCreate>;
 export class JobsService {
   constructor(private http: HttpClient) {}
 
-  list(filters?: { client_id?: string; status?: JobStatus }): Observable<Job[]> {
+  list(filters?: { client_id?: string; project_id?: string; status?: JobStatus }): Observable<Job[]> {
     let params = new HttpParams();
     if (filters?.client_id) params = params.set('client_id', filters.client_id);
+    if (filters?.project_id) params = params.set('project_id', filters.project_id);
     if (filters?.status) params = params.set('status', filters.status);
     return this.http.get<Job[]>('/api/v1.0/jobs', { params });
   }

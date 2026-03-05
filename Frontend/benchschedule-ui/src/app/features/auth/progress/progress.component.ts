@@ -2,9 +2,11 @@ import { Component, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+
 import { JobsService, Job } from '../jobs/jobs.service';
 import { ProgressService, JobUpdate, JobStatus } from './progress.service';
 import { ClientsService, Client } from '../clients/clients.service';
+import { ProjectsService, Project } from '../jobs/project.service';
 
 @Component({
   standalone: true,
@@ -25,94 +27,151 @@ import { ClientsService, Client } from '../clients/clients.service';
 
           <div class="grid">
             <aside class="left">
-              <div class="subhead">Jobs</div>
+              <div class="subhead">Projects</div>
 
               <div class="list">
                 <button
                   class="row"
                   type="button"
-                  *ngFor="let j of jobs"
-                  (click)="selectJob(j)"
-                  [class.active]="j.id === selectedId"
+                  *ngFor="let p of projects"
+                  (click)="selectProject(p)"
+                  [class.active]="p.id === selectedProjectId"
                 >
-                  <div class="name">{{ j.title }}</div>
-                  <div class="meta">{{ j.status }}</div>
+                  <div class="name">{{ p.name }}</div>
+                  <div class="meta">
+                    <span *ngIf="p.client_id">{{ clientName(p.client_id) }} · </span>
+                    <span *ngIf="p.status">{{ p.status }}</span>
+                  </div>
                 </button>
 
-                <div class="empty" *ngIf="jobs.length === 0">No jobs found.</div>
+                <div class="empty" *ngIf="projects.length === 0">No projects found.</div>
               </div>
             </aside>
 
             <section class="right">
-              <ng-container *ngIf="selected as s; else pickAJob">
-                <div class="subhead">Selected Job</div>
+              <ng-container *ngIf="selectedProject as sp; else pickAProject">
+                <div class="subhead">Selected Project</div>
 
                 <div class="details">
-                  <div class="kv"><div class="k">Title</div><div class="v">{{ s.title }}</div></div>
-                  <div class="kv"><div class="k">Job ID</div><div class="v">{{ s.id }}</div></div>
-                  <div class="kv"><div class="k">Client ID</div><div class="v">{{ s.client_id || '—' }}</div></div>
-                  <div class="kv"><div class="k">Client Name</div><div class="v">{{ clientName(s.client_id) }}</div></div>
-                  <div class="kv"><div class="k">Status</div><div class="v">{{ s.status }}</div></div>
+                  <div class="kv"><div class="k">Project Name</div><div class="v">{{ sp.name }}</div></div>
+                  <div class="kv"><div class="k">Project ID</div><div class="v">{{ sp.id }}</div></div>
+                  <div class="kv"><div class="k">Client ID</div><div class="v">{{ sp.client_id || '—' }}</div></div>
+                  <div class="kv"><div class="k">Client Name</div><div class="v">{{ clientName(sp.client_id) }}</div></div>
+                  <div class="kv"><div class="k">Status</div><div class="v">{{ sp.status || '—' }}</div></div>
                 </div>
 
-                <!-- Admin-only endpoint; backend enforces -->
+                <!-- PROJECT PROGRESS -->
                 <div class="details">
-                  <div class="details-title">Change status</div>
+                  <div class="details-title">Project Progress</div>
 
-                  <label class="field">
-                    <span>Status</span>
-                    <select [(ngModel)]="statusDraft">
-                      <option value="planned">planned</option>
-                      <option value="in_progress">in_progress</option>
-                      <option value="completed">completed</option>
-                      <option value="on_hold">on_hold</option>
-                    </select>
-                  </label>
-
-                  <div class="form-actions">
-                    <button class="btn" type="button" (click)="saveStatus()" [disabled]="savingStatus">
-                      Save Status
-                    </button>
-                  </div>
-
-                  <div class="notice error" *ngIf="statusError">{{ statusError }}</div>
-                  <div class="notice ok" *ngIf="statusOk">{{ statusOk }}</div>
-                </div>
-
-                <div class="details">
-                  <div class="details-title">Add comment</div>
-
-                  <label class="field">
-                    <span>Comment</span>
-                    <textarea [(ngModel)]="commentDraft" placeholder="Write an update..."></textarea>
-                  </label>
-
-                  <div class="form-actions">
-                    <button class="btn" type="button" (click)="postComment()" [disabled]="postingComment">
-                      Post Comment
-                    </button>
-                  </div>
-
-                  <div class="notice error" *ngIf="commentError">{{ commentError }}</div>
-                </div>
-
-                <div class="details">
-                  <div class="details-title">Comments</div>
-
-                  <div class="comment" *ngFor="let u of updates">
-                    <div class="comment-head">
-                      <div class="who">{{ u.created_by || 'unknown' }}</div>
-                      <div class="when">{{ u.created_at | date:'medium' }}</div>
+                  <div class="progress-wrap">
+                    <div class="progress-bar">
+                      <div class="progress-fill" [style.width.%]="progressPct"></div>
                     </div>
-                    <div class="comment-body">{{ u.text }}</div>
+                    <div class="progress-meta">
+                      <div class="pct">{{ progressPct }}%</div>
+                      <div class="ratio">{{ completedJobs }} / {{ totalJobs }} jobs completed</div>
+                    </div>
                   </div>
 
-                  <div class="empty" *ngIf="updates.length === 0">No comments yet.</div>
+                  <div class="empty" *ngIf="totalJobs === 0">No jobs in this project yet.</div>
+                </div>
+
+                <!-- JOBS LIST (UNDER PROJECT) -->
+                <div class="details">
+                  <div class="details-title">Jobs in this Project</div>
+
+                  <div class="list">
+                    <button
+                      class="row"
+                      type="button"
+                      *ngFor="let j of projectJobs"
+                      (click)="selectJob(j)"
+                      [class.active]="j.id === selectedJobId"
+                    >
+                      <div class="name">{{ j.title }}</div>
+                      <div class="meta">{{ j.status }}</div>
+                    </button>
+
+                    <div class="empty" *ngIf="projectJobs.length === 0">No jobs found.</div>
+                  </div>
+                </div>
+
+                <!-- SELECTED JOB  -->
+                <ng-container *ngIf="selectedJob as s">
+                  <div class="details">
+                    <div class="details-title">Selected Job</div>
+
+                    <div class="kv"><div class="k">Title</div><div class="v">{{ s.title }}</div></div>
+                    <div class="kv"><div class="k">Job ID</div><div class="v">{{ s.id }}</div></div>
+                    <div class="kv"><div class="k">Client ID</div><div class="v">{{ s.client_id || '—' }}</div></div>
+                    <div class="kv"><div class="k">Client Name</div><div class="v">{{ clientName(s.client_id) }}</div></div>
+                    <div class="kv"><div class="k">Status</div><div class="v">{{ s.status }}</div></div>
+                  </div>
+
+                  <!-- Admin-only endpoint -->
+                  <div class="details">
+                    <div class="details-title">Change status</div>
+
+                    <label class="field">
+                      <span>Status</span>
+                      <select [(ngModel)]="statusDraft">
+                        <option value="planned">planned</option>
+                        <option value="in_progress">in_progress</option>
+                        <option value="completed">completed</option>
+                        <option value="on_hold">on_hold</option>
+                      </select>
+                    </label>
+
+                    <div class="form-actions">
+                      <button class="btn" type="button" (click)="saveStatus()" [disabled]="savingStatus">
+                        Save Status
+                      </button>
+                    </div>
+
+                    <div class="notice error" *ngIf="statusError">{{ statusError }}</div>
+                    <div class="notice ok" *ngIf="statusOk">{{ statusOk }}</div>
+                  </div>
+
+                  <div class="details">
+                    <div class="details-title">Add comment</div>
+
+                    <label class="field">
+                      <span>Comment</span>
+                      <textarea [(ngModel)]="commentDraft" placeholder="Write an update..."></textarea>
+                    </label>
+
+                    <div class="form-actions">
+                      <button class="btn" type="button" (click)="postComment()" [disabled]="postingComment">
+                        Post Comment
+                      </button>
+                    </div>
+
+                    <div class="notice error" *ngIf="commentError">{{ commentError }}</div>
+                  </div>
+
+                  <div class="details">
+                    <div class="details-title">Comments</div>
+
+                    <div class="comment" *ngFor="let u of updates">
+                      <div class="comment-head">
+                        <div class="who">{{ u.created_by || 'unknown' }}</div>
+                        <div class="when">{{ u.created_at | date:'medium' }}</div>
+                      </div>
+                      <div class="comment-body">{{ u.text }}</div>
+                    </div>
+
+                    <div class="empty" *ngIf="updates.length === 0">No comments yet.</div>
+                  </div>
+                </ng-container>
+
+                <div class="empty big" *ngIf="projectJobs.length > 0 && !selectedJob">
+                  Select a job to view comments / update status.
                 </div>
               </ng-container>
 
-              <ng-template #pickAJob>
-                <div class="empty big">Select a job to view progress.</div>
+              <ng-template #pickAProject>
+                <div class="empty big">Select a project to view progress.</div>
               </ng-template>
             </section>
           </div>
@@ -192,16 +251,25 @@ import { ClientsService, Client } from '../clients/clients.service';
     .empty { padding:16px; color:#6b7280; }
     .empty.big { padding:24px; }
 
+    .progress-wrap { display:flex; flex-direction:column; gap:10px; }
+    .progress-bar { height:12px; border-radius:999px; background:rgba(0,0,0,0.08); overflow:hidden; }
+    .progress-fill { height:100%; background:rgba(234,88,12,.75); width:0%; }
+    .progress-meta { display:flex; justify-content:space-between; gap:12px; align-items:center; }
+    .pct { font-weight:800; color:#111827; }
+    .ratio { color:#6b7280; font-size:13px; }
+
     .bottombar { height:56px; display:flex; align-items:center; justify-content:center; background:#fff; border-top:1px solid rgba(0,0,0,0.08); }
     .center { font-weight:700; color:#ea580c; }
   `]
 })
 export class ProgressComponent {
-  jobs: Job[] = [];
-  updates: JobUpdate[] = [];
   clients: Client[] = [];
+  projects: Project[] = [];
+  projectJobs: Job[] = [];
+  updates: JobUpdate[] = [];
 
-  selectedId: string | null = null;
+  selectedProjectId: string | null = null;
+  selectedJobId: string | null = null;
 
   commentDraft = '';
   postingComment = false;
@@ -213,109 +281,152 @@ export class ProgressComponent {
   statusOk = '';
 
   constructor(
-  private jobsService: JobsService,
-  private progressService: ProgressService,
-  private clientsService: ClientsService,
-  private cdr: ChangeDetectorRef
-) {}
+    private jobsService: JobsService,
+    private projectsService: ProjectsService,
+    private progressService: ProgressService,
+    private clientsService: ClientsService,
+    private cdr: ChangeDetectorRef
+  ) {}
 
   ngOnInit() {
-  if (typeof window === 'undefined') return;
-  this.loadJobs();
-  this.loadClients();
-}
+    if (typeof window === 'undefined') return;
+    this.loadProjects();
+    this.loadClients();
+  }
 
-get selected(): Job | null {
-  return this.selectedId ? (this.jobs.find(j => j.id === this.selectedId) ?? null) : null;
-}
+  loadProjects() {
+    this.projectsService.list().subscribe({
+      next: (data: Project[]) => { this.projects = data; this.cdr.detectChanges(); },
+      error: (e: any) => console.error('Projects load failed', e),
+    });
+  }
 
-loadJobs() {
-  this.jobsService.list().subscribe({
-    next: (data: Job[]) => {
-      this.jobs = data;
-      this.cdr.detectChanges();
-    },
-    error: (e: any) => console.error('Jobs load failed', e),
-  });
-}
+  loadClients() {
+    this.clientsService.list().subscribe({
+      next: (data: Client[]) => { this.clients = data; this.cdr.detectChanges(); },
+      error: (e: any) => console.error('Clients load failed', e),
+    });
+  }
 
-loadClients() {
-  this.clientsService.list().subscribe({
-    next: (data: Client[]) => { this.clients = data; this.cdr.detectChanges(); },
-    error: (e: any) => console.error('Clients load failed', e),
-  });
-}
+  clientName(clientId: string | null | undefined): string {
+    if (!clientId) return '—';
+    return this.clients.find(c => c.id === clientId)?.name ?? '—';
+  }
 
-clientName(clientId: string | null | undefined): string {
-  if (!clientId) return '—';
-  return this.clients.find(c => c.id === clientId)?.name ?? '—';
-}
+  get selectedProject(): Project | null {
+    return this.selectedProjectId
+      ? (this.projects.find(p => p.id === this.selectedProjectId) ?? null)
+      : null;
+  }
 
-selectJob(j: Job) {
-  this.selectedId = j.id;
-  this.statusDraft = j.status as JobStatus;
-  this.statusError = '';
-  this.statusOk = '';
-  this.commentError = '';
-  this.commentDraft = '';
-  this.loadUpdates(j.id);
-}
+  get selectedJob(): Job | null {
+    return this.selectedJobId
+      ? (this.projectJobs.find(j => j.id === this.selectedJobId) ?? null)
+      : null;
+  }
 
-loadUpdates(jobId: string) {
-  this.progressService.listUpdates(jobId).subscribe({
-    next: (data: JobUpdate[]) => {
-      this.updates = data;
-      this.cdr.detectChanges();
-    },
-    error: (e: any) => console.error('Updates load failed', e),
-  });
-}
+  selectProject(p: Project) {
+    this.selectedProjectId = p.id;
+    this.selectedJobId = null;
+    this.projectJobs = [];
+    this.updates = [];
 
-postComment() {
-  const s = this.selected;
-  if (!s) return;
+    this.statusError = '';
+    this.statusOk = '';
+    this.commentError = '';
+    this.commentDraft = '';
 
-  const text = this.commentDraft.trim();
-  if (!text) return;
+    this.loadProjectJobs(p.id);
+  }
 
-  this.postingComment = true;
-  this.commentError = '';
+  private loadProjectJobs(projectId: string) {
+    this.jobsService.list({ project_id: projectId }).subscribe({
+      next: (data: Job[]) => {
+        this.projectJobs = data;
+        this.cdr.detectChanges();
+      },
+      error: (e: any) => console.error('Project jobs load failed', e),
+    });
+  }
 
-  this.progressService.addUpdate(s.id, text).subscribe({
-    next: () => {
-      this.commentDraft = '';
-      this.postingComment = false;
-      this.loadUpdates(s.id);
-    },
-    error: (e: any) => {
-      this.postingComment = false;
-      this.commentError = 'Could not post comment.';
-      console.error('Add update failed', e);
-    }
-  });
-}
+  // --- Project progress ---
+  get totalJobs(): number {
+    return this.projectJobs.length;
+  }
 
-saveStatus() {
-  const s = this.selected;
-  if (!s) return;
+  get completedJobs(): number {
+    return this.projectJobs.filter(j => j.status === 'completed').length;
+  }
 
-  this.savingStatus = true;
-  this.statusError = '';
-  this.statusOk = '';
+  get progressPct(): number {
+    if (this.totalJobs === 0) return 0;
+    return Math.round((this.completedJobs / this.totalJobs) * 100);
+  }
 
-  this.progressService.patchStatus(s.id, this.statusDraft).subscribe({
-    next: (updated: Job) => {
-      this.jobs = this.jobs.map(j => (j.id === updated.id ? updated : j));
-      this.savingStatus = false;
-      this.statusOk = 'Status saved.';
-      this.cdr.detectChanges();
-    },
-    error: (e: any) => {
-      this.savingStatus = false;
-      if (e?.status === 403) this.statusError = 'Not allowed (admin only).';
-      else this.statusError = 'Could not save status.';
-      console.error('Patch status failed', e);
-    }
-  });
-}
+  // --- Job selection---
+  selectJob(j: Job) {
+    this.selectedJobId = j.id;
+    this.statusDraft = j.status as JobStatus;
+    this.statusError = '';
+    this.statusOk = '';
+    this.commentError = '';
+    this.commentDraft = '';
+    this.loadUpdates(j.id);
+  }
+
+  private loadUpdates(jobId: string) {
+    this.progressService.listUpdates(jobId).subscribe({
+      next: (data: JobUpdate[]) => { this.updates = data; this.cdr.detectChanges(); },
+      error: (e: any) => console.error('Updates load failed', e),
+    });
+  }
+
+  postComment() {
+    const s = this.selectedJob;
+    if (!s) return;
+
+    const text = this.commentDraft.trim();
+    if (!text) return;
+
+    this.postingComment = true;
+    this.commentError = '';
+
+    this.progressService.addUpdate(s.id, text).subscribe({
+      next: () => {
+        this.commentDraft = '';
+        this.postingComment = false;
+        this.loadUpdates(s.id);
+      },
+      error: (e: any) => {
+        this.postingComment = false;
+        this.commentError = 'Could not post comment.';
+        console.error('Add update failed', e);
+      }
+    });
+  }
+
+  saveStatus() {
+    const s = this.selectedJob;
+    if (!s) return;
+
+    this.savingStatus = true;
+    this.statusError = '';
+    this.statusOk = '';
+
+    this.progressService.patchStatus(s.id, this.statusDraft).subscribe({
+      next: (updated: Job) => {
+        // update in projectJobs list
+        this.projectJobs = this.projectJobs.map(j => (j.id === updated.id ? updated : j));
+        this.savingStatus = false;
+        this.statusOk = 'Status saved.';
+        this.cdr.detectChanges();
+      },
+      error: (e: any) => {
+        this.savingStatus = false;
+        if (e?.status === 403) this.statusError = 'Not allowed (admin only).';
+        else this.statusError = 'Could not save status.';
+        console.error('Patch status failed', e);
+      }
+    });
+  }
 }

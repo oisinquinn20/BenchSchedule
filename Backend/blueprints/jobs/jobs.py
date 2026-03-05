@@ -10,6 +10,7 @@ jobs_bp = Blueprint("jobs_bp", __name__)
 jobs_collection = globals.db["jobs"]
 clients_collection = globals.db["clients"]
 job_updates_collection = globals.db["job_updates"]
+projects_collection = globals.db["projects"]
 
 ALLOWED_STATUSES = {"planned", "in_progress", "completed", "on_hold"}
 
@@ -17,6 +18,7 @@ def _job_to_json(doc):
     return {
         "id": str(doc["_id"]),
         "client_id": str(doc["client_id"]) if doc.get("client_id") else None,
+        "project_id": str(doc["project_id"]) if doc.get("project_id") else None,
         "title": doc.get("title"),
         "description": doc.get("description"),
         "estimated_start": doc.get("estimated_start"),
@@ -44,6 +46,7 @@ def _get_username_from_token():
 @jwt_required
 def list_jobs():
     client_id = request.args.get("client_id")
+    project_id = request.args.get("project_id")
     status = request.args.get("status")
 
     query = {}
@@ -53,6 +56,12 @@ def list_jobs():
         if not oid:
             return make_response(jsonify({"message": "Invalid client_id"}), 400)
         query["client_id"] = oid
+    
+    if project_id:
+        oid = _parse_object_id(project_id, "project_id")
+        if not oid:
+            return make_response(jsonify({"message": "Invalid project_id"}), 400)
+        query["project_id"] = oid
 
     if status:
         if status not in ALLOWED_STATUSES:
@@ -82,6 +91,14 @@ def create_job():
 
     if not clients_collection.find_one({"_id": client_oid}):
         return make_response(jsonify({"message": "Client not found"}), 404)
+    
+    project_oid = None
+    if data.get("project_id"):
+        project_oid = _parse_object_id(data.get("project_id"), "project_id")
+        if not project_oid:
+            return make_response(jsonify({"message": "Invalid project_id"}), 400)
+        if not projects_collection.find_one({"_id": project_oid}):
+            return make_response(jsonify({"message": "Project not found"}), 404)
 
     status = (data.get("status") or "planned").strip()
     if status not in ALLOWED_STATUSES:
@@ -89,6 +106,7 @@ def create_job():
 
     new_doc = {
         "client_id": client_oid,
+        "project_id": project_oid,
         "title": title,
         "description": (data.get("description") or "").strip(),
         "estimated_start": (data.get("estimated_start") or "").strip(),
@@ -154,6 +172,17 @@ def update_job(job_id):
         if not clients_collection.find_one({"_id": client_oid}):
             return make_response(jsonify({"message": "Client not found"}), 404)
         update_fields["client_id"] = client_oid
+
+    if "project_id" in data:
+        if data.get("project_id"):
+            project_oid = _parse_object_id(data.get("project_id"), "project_id")
+            if not project_oid:
+                return make_response(jsonify({"message": "Invalid project_id"}), 400)
+            if not projects_collection.find_one({"_id": project_oid}):
+                return make_response(jsonify({"message": "Project not found"}), 404)
+            update_fields["project_id"] = project_oid
+        else:
+            update_fields["project_id"] = None
 
     if not update_fields:
         return make_response(jsonify({"message": "No valid fields to update"}), 400)

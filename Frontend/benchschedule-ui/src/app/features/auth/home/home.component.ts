@@ -22,7 +22,7 @@ import { RouterLink } from '@angular/router';
 
 <a class="tile" routerLink="/jobs">
   <img src="assets/icons/jobs.png" class="tile-icon" />
-  <span>Jobs</span>
+  <span>Projects</span>
 </a>
 
 <a class="tile" routerLink="/planner">

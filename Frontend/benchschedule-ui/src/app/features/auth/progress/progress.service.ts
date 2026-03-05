@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Job } from '../jobs/jobs.service';
+import { ProjectsService, Project } from '../jobs/project.service';
 
 export type JobStatus = 'planned' | 'in_progress' | 'completed' | 'on_hold';
 

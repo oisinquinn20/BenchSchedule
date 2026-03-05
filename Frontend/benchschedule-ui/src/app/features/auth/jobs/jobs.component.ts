@@ -3,8 +3,9 @@ import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 
-import { JobsService, Job } from './jobs.service';
+import { JobsService, Job, JobStatus } from './jobs.service';
 import { ClientsService, Client } from '../clients/clients.service';
+import { ProjectsService, Project, ProjectStatus } from './project.service';
 
 @Component({
   standalone: true,
@@ -20,30 +21,40 @@ import { ClientsService, Client } from '../clients/clients.service';
       <main class="content">
         <section class="panel">
           <div class="panel-head">
-            <div class="title">Jobs</div>
+            <div class="title">Projects</div>
 
-            <button
-              *ngIf="viewMode === 'selected'"
-              class="btn"
-              type="button"
-              (click)="backToList()"
-            >
-              ← Back
-            </button>
-        
+            <div style="display:flex; gap:10px; align-items:center;">
+              <button
+                *ngIf="viewMode === 'selected'"
+                class="btn"
+                type="button"
+                (click)="backToList()"
+              >
+                ← Back
+              </button>
 
-            <button
-              *ngIf="viewMode === 'list'"
-              class="btn"
-              type="button"
-              (click)="openAdd()"
-            >
-              + Add Job
-            </button>
+              <button
+                *ngIf="viewMode === 'selected'"
+                class="btn"
+                type="button"
+                (click)="openAddJob()"
+                [disabled]="!selectedProject"
+              >
+                + Add Job
+              </button>
+
+              <button
+                *ngIf="viewMode === 'list'"
+                class="btn"
+                type="button"
+                (click)="openAddProject()"
+              >
+                + Add Project
+              </button>
+            </div>
           </div>
-        
 
-          <!-- SEARCH / DROPDOWN + FILTER -->
+          <!-- SEARCH / FILTER (PROJECTS ONLY) -->
           <div class="details" *ngIf="viewMode === 'list'">
             <div class="details-title">Search</div>
 
@@ -59,7 +70,7 @@ import { ClientsService, Client } from '../clients/clients.service';
 
             <label class="field">
               <span>Search</span>
-              <input [(ngModel)]="searchQuery" placeholder="Search by job title..." />
+              <input [(ngModel)]="searchQuery" placeholder="Search by project name..." />
             </label>
 
             <label class="field">
@@ -74,109 +85,178 @@ import { ClientsService, Client } from '../clients/clients.service';
             </label>
           </div>
 
-          <!-- LIST -->
+          <!-- PROJECT LIST -->
           <div class="list" *ngIf="viewMode === 'list'">
             <button
               class="row"
               type="button"
-              *ngFor="let j of filteredJobs"
-              (click)="select(j)"
+              *ngFor="let p of filteredProjects"
+              (click)="selectProject(p)"
             >
-              <div class="name">{{ j.title }}</div>
+              <div class="name">{{ p.name }}</div>
               <div class="meta">
-                <span *ngIf="j.client_id">{{ j.client_id }} · </span>
-                <span *ngIf="j.status">{{ j.status }}</span>
+                <span *ngIf="p.client_id">{{ clientName(p.client_id) }} · </span>
+                <span *ngIf="p.status">{{ p.status }}</span>
               </div>
             </button>
 
-            <div class="empty" *ngIf="filteredJobs.length === 0">
-              No jobs found.
+            <div class="empty" *ngIf="filteredProjects.length === 0">
+              No projects found.
             </div>
           </div>
 
-          <!-- SELECTED JOB -->
-          <ng-container *ngIf="viewMode === 'selected' && selected as s">
+          <!-- SELECTED PROJECT -->
+          <ng-container *ngIf="viewMode === 'selected' && selectedProject as sp">
             <div class="details">
-              <div class="details-title">Selected Job</div>
+              <div class="details-title">Selected Project</div>
 
-              <div class="kv"><div class="k">Title</div><div class="v">{{ s.title }}</div></div>
-              <div class="kv"><div class="k">Status</div><div class="v">{{ s.status }}</div></div>
-              <div class="kv"><div class="k">Job ID</div><div class="v">{{ s.id }}</div></div>
-              <div class="kv"><div class="k">Client Name</div><div class="v">{{ clientName(s.client_id) }}</div></div>
-              <div class="kv"><div class="k">Client ID</div><div class="v">{{ s.client_id }}</div></div>
-              <div class="kv"><div class="k">Estimated Start</div><div class="v">{{ s.estimated_start || '—' }}</div></div>
-              <div class="kv"><div class="k">Estimated End</div><div class="v">{{ s.estimated_end || '—' }}</div></div>
-
-              <div class="kv block">
-                <div class="k">Description</div>
-                <div class="v">{{ s.description || '—' }}</div>
-              </div>
+              <div class="kv"><div class="k">Project Name</div><div class="v">{{ sp.name }}</div></div>
+              <div class="kv"><div class="k">Project ID</div><div class="v">{{ sp.id }}</div></div>
+              <div class="kv"><div class="k">Client Name</div><div class="v">{{ clientName(sp.client_id) }}</div></div>
+              <div class="kv"><div class="k">Client ID</div><div class="v">{{ sp.client_id || '—' }}</div></div>
+              <div class="kv"><div class="k">Status</div><div class="v">{{ sp.status || '—' }}</div></div>
 
               <div class="form-actions">
-                <button class="btn" type="button" (click)="openEdit()">Update</button>
-                <button class="btn" type="button" (click)="deleteSelected()">DELETE</button>
+                <button class="btn" type="button" (click)="openEditProject()">Update</button>
+                <button class="btn" type="button" (click)="deleteProject()">DELETE</button>
               </div>
             </div>
+
+            <!-- PROJECT JOBS LIST -->
+            <div class="details" *ngIf="projectViewMode === 'jobs'">
+              <div class="details-title">Jobs in this Project</div>
+
+              <div class="list">
+                <button
+                  class="row"
+                  type="button"
+                  *ngFor="let j of projectJobs"
+                  (click)="selectJob(j)"
+                >
+                  <div class="name">{{ j.title }}</div>
+                  <div class="meta">
+                    <span *ngIf="j.status">{{ j.status }}</span>
+                  </div>
+                </button>
+
+                <div class="empty" *ngIf="projectJobs.length === 0">
+                  No jobs in this project.
+                </div>
+              </div>
+            </div>
+
+            <!-- SELECTED JOB (INSIDE PROJECT) -->
+            <ng-container *ngIf="projectViewMode === 'jobSelected' && selectedJob as sj">
+              <div class="details">
+                <div class="details-title">Selected Job</div>
+
+                <div class="kv"><div class="k">Title</div><div class="v">{{ sj.title }}</div></div>
+                <div class="kv"><div class="k">Status</div><div class="v">{{ sj.status }}</div></div>
+                <div class="kv"><div class="k">Job ID</div><div class="v">{{ sj.id }}</div></div>
+                <div class="kv"><div class="k">Client Name</div><div class="v">{{ clientName(sj.client_id) }}</div></div>
+                <div class="kv"><div class="k">Client ID</div><div class="v">{{ sj.client_id || '—' }}</div></div>
+                <div class="kv"><div class="k">Project ID</div><div class="v">{{ sj.project_id || '—' }}</div></div>
+                <div class="kv"><div class="k">Estimated Start</div><div class="v">{{ sj.estimated_start || '—' }}</div></div>
+                <div class="kv"><div class="k">Estimated End</div><div class="v">{{ sj.estimated_end || '—' }}</div></div>
+
+                <div class="kv block">
+                  <div class="k">Description</div>
+                  <div class="v">{{ sj.description || '—' }}</div>
+                </div>
+
+                <div class="form-actions">
+                  <button class="btn" type="button" (click)="backToProjectJobs()">← Back to Jobs</button>
+                  <button class="btn" type="button" (click)="openEditJob()">Update</button>
+                  <button class="btn" type="button" (click)="deleteSelectedJob()">DELETE</button>
+                </div>
+              </div>
+            </ng-container>
           </ng-container>
 
           <div class="panel-footer" *ngIf="viewMode === 'list'">
-                <button type="button" class="btn">Previous</button>
-                <button type="button" class="btn">Next</button>
-            </div>
+            <button type="button" class="btn">Previous</button>
+            <button type="button" class="btn">Next</button>
+          </div>
         </section>
       </main>
 
-      <!-- ADD / EDIT MODAL -->
+      <!-- MODAL -->
       <div class="modal-backdrop" *ngIf="showModal">
         <div class="details">
           <div class="details-title">
-            {{ formMode === 'add' ? 'Add Job' : 'Update Job' }}
+            {{ modalTitle() }}
           </div>
 
-          <label class="field">
-            <span>Client</span>
-            <select [(ngModel)]="form.client_id">
-              <option value="">-- Select a client --</option>
-              <option *ngFor="let c of clients" [value]="c.id">
-                {{ c.name }}
-              </option>
-            </select>
-          </label>
+          <!-- PROJECT FORM -->
+          <ng-container *ngIf="modalMode === 'addProject' || modalMode === 'editProject'">
+            <label class="field">
+              <span>Client</span>
+              <select [(ngModel)]="projectForm.client_id">
+                <option value="">-- Select a client --</option>
+                <option *ngFor="let c of clients" [value]="c.id">
+                  {{ c.name }}
+                </option>
+              </select>
+            </label>
 
-          <label class="field">
-            <span>Title</span>
-            <input [(ngModel)]="form.title" />
-          </label>
+            <label class="field">
+              <span>Project name</span>
+              <input [(ngModel)]="projectForm.name" />
+            </label>
 
-          <label class="field">
-            <span>Status</span>
-            <select [(ngModel)]="form.status">
-              <option value="planned">planned</option>
-              <option value="in_progress">in_progress</option>
-              <option value="completed">completed</option>
-              <option value="on_hold">on_hold</option>
-            </select>
-          </label>
+            <label class="field">
+              <span>Status</span>
+              <select [(ngModel)]="projectForm.status">
+                <option value="planned">planned</option>
+                <option value="in_progress">in_progress</option>
+                <option value="completed">completed</option>
+                <option value="on_hold">on_hold</option>
+              </select>
+            </label>
+          </ng-container>
 
-          <label class="field">
-            <span>Description</span>
-            <textarea [(ngModel)]="form.description"></textarea>
-          </label>
+          <!-- JOB FORM -->
+          <ng-container *ngIf="modalMode === 'addJob' || modalMode === 'editJob'">
+            <div class="kv" *ngIf="selectedProject as sp">
+              <div class="k">Project</div>
+              <div class="v">{{ sp.name }} ({{ sp.id }})</div>
+            </div>
 
-          <label class="field">
-            <span>Estimated Start</span>
-            <input [(ngModel)]="form.estimated_start" placeholder="YYYY-MM-DD" />
-          </label>
+            <label class="field">
+              <span>Title</span>
+              <input [(ngModel)]="jobForm.title" />
+            </label>
 
-          <label class="field">
-            <span>Estimated End</span>
-            <input [(ngModel)]="form.estimated_end" placeholder="YYYY-MM-DD" />
-          </label>
+            <label class="field">
+              <span>Status</span>
+              <select [(ngModel)]="jobForm.status">
+                <option value="planned">planned</option>
+                <option value="in_progress">in_progress</option>
+                <option value="completed">completed</option>
+                <option value="on_hold">on_hold</option>
+              </select>
+            </label>
+
+            <label class="field">
+              <span>Description</span>
+              <textarea [(ngModel)]="jobForm.description"></textarea>
+            </label>
+
+            <label class="field">
+              <span>Estimated Start</span>
+              <input [(ngModel)]="jobForm.estimated_start" placeholder="YYYY-MM-DD" />
+            </label>
+
+            <label class="field">
+              <span>Estimated End</span>
+              <input [(ngModel)]="jobForm.estimated_end" placeholder="YYYY-MM-DD" />
+            </label>
+          </ng-container>
 
           <div class="form-actions">
             <button class="btn" type="button" (click)="closeModal()">Cancel</button>
-            <button class="btn" type="button" (click)="submitForm()">
-              {{ formMode === 'add' ? 'Add' : 'Save' }}
+            <button class="btn" type="button" (click)="submitModal()">
+              {{ modalPrimaryLabel() }}
             </button>
           </div>
         </div>
@@ -274,18 +354,17 @@ import { ClientsService, Client } from '../clients/clients.service';
       position:fixed; inset:0; background:rgba(0,0,0,.35);
       display:flex; align-items:center; justify-content:center; z-index:1000;
       padding: 16px;
-      
     }
 
     .bottombar { height:56px; display:flex; align-items:center; justify-content:center; background:#fff; border-top:1px solid rgba(0,0,0,0.08); }
     .center { font-weight:700; color:#ea580c; }
 
     .panel-footer {
-    padding: 14px 16px;
-    border-top: 1px solid rgba(0,0,0,0.06);
-    display: flex;
-    justify-content: flex-end;
-    gap: 10px;
+      padding: 14px 16px;
+      border-top: 1px solid rgba(0,0,0,0.06);
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
     }
 
     @media (max-width: 900px) {
@@ -295,24 +374,41 @@ import { ClientsService, Client } from '../clients/clients.service';
   `]
 })
 export class JobsComponent {
-  jobs: Job[] = [];
-  selectedId: string | null = null;
-
   viewMode: 'list' | 'selected' = 'list';
-  showModal = false;
-  formMode: 'add' | 'edit' = 'add';
+
+  // inside selected project: either job list or selected job
+  projectViewMode: 'jobs' | 'jobSelected' = 'jobs';
 
   clients: Client[] = [];
+  projects: Project[] = [];
+  projectJobs: Job[] = [];
 
-  // Search/dropdown + status filter
+  selectedProjectId: string | null = null;
+  selectedJobId: string | null = null;
+
+  // Project filters 
   clientFilterId = '';
   searchQuery = '';
-  statusFilter: '' | 'planned' | 'in_progress' | 'completed' | 'on_hold' = '';
+  statusFilter: '' | ProjectStatus = '';
 
-  form = {
+  showModal = false;
+  modalMode: 'addProject' | 'editProject' | 'addJob' | 'editJob' = 'addProject';
+
+  projectForm: { client_id: string; name: string; status: ProjectStatus } = {
     client_id: '',
+    name: '',
+    status: 'planned',
+  };
+
+  jobForm: {
+    title: string;
+    status: JobStatus;
+    description: string;
+    estimated_start: string;
+    estimated_end: string;
+  } = {
     title: '',
-    status: 'planned' as 'planned' | 'in_progress' | 'completed' | 'on_hold',
+    status: 'planned',
     description: '',
     estimated_start: '',
     estimated_end: '',
@@ -321,6 +417,7 @@ export class JobsComponent {
   constructor(
     private jobsService: JobsService,
     private clientsService: ClientsService,
+    private projectsService: ProjectsService,
     private cdr: ChangeDetectorRef
   ) {}
 
@@ -329,26 +426,10 @@ export class JobsComponent {
     this.load();
   }
 
-  get selected(): Job | null {
-    return this.selectedId
-      ? this.jobs.find(j => j.id === this.selectedId) ?? null
-      : null;
-  }
-
-  get filteredJobs(): Job[] {
-    const q = this.searchQuery.trim().toLowerCase();
-    return this.jobs.filter(j => {
-      if (this.clientFilterId && j.client_id !== this.clientFilterId) return false;
-      if (this.statusFilter && j.status !== this.statusFilter) return false;
-      if (q && !(j.title || '').toLowerCase().includes(q)) return false;
-      return true;
-    });
-  }
-
   load() {
-    this.jobsService.list().subscribe({
-      next: (data) => { this.jobs = data; this.cdr.detectChanges(); },
-      error: (e) => console.error('Jobs load failed', e),
+    this.projectsService.list().subscribe({
+      next: (data) => { this.projects = data; this.cdr.detectChanges(); },
+      error: (e) => console.error('Projects load failed', e),
     });
 
     this.clientsService.list().subscribe({
@@ -358,24 +439,103 @@ export class JobsComponent {
   }
 
   clientName(clientId: string | null | undefined): string {
-  if (!clientId) return '—';
-  return this.clients.find(c => c.id === clientId)?.name ?? '—';
+    if (!clientId) return '—';
+    return this.clients.find(c => c.id === clientId)?.name ?? '—';
   }
 
-  select(job: Job) {
-    this.selectedId = job.id;
+  get filteredProjects(): Project[] {
+    const q = this.searchQuery.trim().toLowerCase();
+    return this.projects.filter(p => {
+      if (this.clientFilterId && p.client_id !== this.clientFilterId) return false;
+      if (this.statusFilter && p.status !== this.statusFilter) return false;
+      if (q && !(p.name || '').toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }
+
+  get selectedProject(): Project | null {
+    return this.selectedProjectId
+      ? (this.projects.find(p => p.id === this.selectedProjectId) ?? null)
+      : null;
+  }
+
+  get selectedJob(): Job | null {
+    return this.selectedJobId
+      ? (this.projectJobs.find(j => j.id === this.selectedJobId) ?? null)
+      : null;
+  }
+
+  selectProject(project: Project) {
+    this.selectedProjectId = project.id;
+    this.selectedJobId = null;
+    this.projectViewMode = 'jobs';
     this.viewMode = 'selected';
+
+    this.loadProjectJobs(project.id);
+  }
+
+  private loadProjectJobs(projectId: string) {
+    this.jobsService.list({ project_id: projectId }).subscribe({
+      next: (data) => { this.projectJobs = data; this.cdr.detectChanges(); },
+      error: (e) => console.error('Project jobs load failed', e),
+    });
   }
 
   backToList() {
-    this.selectedId = null;
     this.viewMode = 'list';
+    this.selectedProjectId = null;
+    this.selectedJobId = null;
+    this.projectJobs = [];
+    this.projectViewMode = 'jobs';
   }
 
-  openAdd() {
-    this.formMode = 'add';
-    this.form = {
-      client_id: '',
+  selectJob(job: Job) {
+    this.selectedJobId = job.id;
+    this.projectViewMode = 'jobSelected';
+  }
+
+  backToProjectJobs() {
+    this.selectedJobId = null;
+    this.projectViewMode = 'jobs';
+  }
+
+  // ---------- Projects CRUD ----------
+  openAddProject() {
+    this.modalMode = 'addProject';
+    this.projectForm = { client_id: '', name: '', status: 'planned' };
+    this.showModal = true;
+  }
+
+  openEditProject() {
+    const sp = this.selectedProject;
+    if (!sp) return;
+
+    this.modalMode = 'editProject';
+    this.projectForm = {
+      client_id: sp.client_id || '',
+      name: sp.name || '',
+      status: (sp.status || 'planned') as ProjectStatus,
+    };
+    this.showModal = true;
+  }
+
+  deleteProject() {
+    const sp = this.selectedProject;
+    if (!sp) return;
+    if (!confirm('Delete this project?')) return;
+
+    this.projectsService.delete(sp.id).subscribe({
+      next: () => { this.backToList(); this.load(); },
+      error: (e) => { console.error('Delete project failed', e); alert('Delete failed'); }
+    });
+  }
+
+  openAddJob() {
+    const sp = this.selectedProject;
+    if (!sp) return;
+
+    this.modalMode = 'addJob';
+    this.jobForm = {
       title: '',
       status: 'planned',
       description: '',
@@ -385,73 +545,129 @@ export class JobsComponent {
     this.showModal = true;
   }
 
-  openEdit() {
-    const s = this.selected;
-    if (!s) return;
+  openEditJob() {
+    const sj = this.selectedJob;
+    if (!sj) return;
 
-    this.formMode = 'edit';
-    this.form = {
-      client_id: s.client_id || '',
-      title: s.title || '',
-      status: s.status,
-      description: s.description || '',
-      estimated_start: s.estimated_start || '',
-      estimated_end: s.estimated_end || '',
+    this.modalMode = 'editJob';
+    this.jobForm = {
+      title: sj.title || '',
+      status: (sj.status || 'planned') as JobStatus,
+      description: sj.description || '',
+      estimated_start: sj.estimated_start || '',
+      estimated_end: sj.estimated_end || '',
     };
     this.showModal = true;
+  }
+
+  deleteSelectedJob() {
+    const sj = this.selectedJob;
+    if (!sj) return;
+    if (!confirm('Delete this job?')) return;
+
+    this.jobsService.delete(sj.id).subscribe({
+      next: () => {
+        const sp = this.selectedProject;
+        if (sp) this.loadProjectJobs(sp.id);
+        this.backToProjectJobs();
+      },
+      error: (e) => { console.error('Delete job failed', e); alert('Delete failed'); }
+    });
   }
 
   closeModal() {
     this.showModal = false;
   }
 
-  submitForm() {
-    const title = this.form.title.trim();
-    const client_id = this.form.client_id;
+  modalTitle(): string {
+    switch (this.modalMode) {
+      case 'addProject': return 'Add Project';
+      case 'editProject': return 'Update Project';
+      case 'addJob': return 'Add Job';
+      case 'editJob': return 'Update Job';
+    }
+  }
 
-    if (!client_id) return alert('Client is required');
+  modalPrimaryLabel(): string {
+    switch (this.modalMode) {
+      case 'addProject': return 'Add';
+      case 'editProject': return 'Save';
+      case 'addJob': return 'Add';
+      case 'editJob': return 'Save';
+    }
+  }
+
+  submitModal() {
+    if (this.modalMode === 'addProject' || this.modalMode === 'editProject') {
+      const client_id = (this.projectForm.client_id || '').trim();
+      const name = (this.projectForm.name || '').trim();
+
+      if (!client_id) return alert('Client is required');
+      if (!name) return alert('Project name is required');
+
+      const payload = { client_id, name, status: this.projectForm.status };
+
+      if (this.modalMode === 'addProject') {
+        this.projectsService.create(payload).subscribe({
+          next: () => { this.showModal = false; this.load(); },
+          error: (e) => console.error('Create project failed', e),
+        });
+        return;
+      }
+
+      const sp = this.selectedProject;
+      if (!sp) return;
+
+      this.projectsService.update(sp.id, payload).subscribe({
+        next: () => { this.showModal = false; this.load(); },
+        error: (e) => console.error('Update project failed', e),
+      });
+
+      return;
+    }
+
+    // add/edit job inside selected project
+    const sp = this.selectedProject;
+    if (!sp) return;
+
+    const title = (this.jobForm.title || '').trim();
     if (!title) return alert('Title is required');
+    if (!sp.client_id) return alert('Selected project has no client_id');
 
     const payload: any = {
-      client_id,
       title,
-      status: this.form.status,
+      status: this.jobForm.status,
+      client_id: sp.client_id,
+      project_id: sp.id,
     };
 
-    if (this.form.description?.trim()) payload.description = this.form.description.trim();
-    if (this.form.estimated_start?.trim()) payload.estimated_start = this.form.estimated_start.trim();
-    if (this.form.estimated_end?.trim()) payload.estimated_end = this.form.estimated_end.trim();
+    if (this.jobForm.description?.trim()) payload.description = this.jobForm.description.trim();
+    if (this.jobForm.estimated_start?.trim()) payload.estimated_start = this.jobForm.estimated_start.trim();
+    if (this.jobForm.estimated_end?.trim()) payload.estimated_end = this.jobForm.estimated_end.trim();
 
-    if (this.formMode === 'add') {
+    if (this.modalMode === 'addJob') {
       this.jobsService.create(payload).subscribe({
-        next: () => { this.showModal = false; this.load(); },
+        next: () => {
+          this.showModal = false;
+          this.loadProjectJobs(sp.id);
+          this.projectViewMode = 'jobs';
+        },
         error: (e) => console.error('Create job failed', e),
       });
       return;
     }
 
-    if (this.formMode === 'edit' && this.selectedId) {
-      this.jobsService.update(this.selectedId, payload).subscribe({
-        next: () => { this.showModal = false; this.load(); },
-        error: (e) => console.error('Update job failed', e),
-      });
-    }
-  }
-    deleteSelected() {
-    console.log('DELETE CLICKED', this.selectedId);
+    // edit job
+    const sj = this.selectedJob;
+    if (!sj) return;
 
-    if (!this.selectedId) return;
-    if (!confirm('Delete this job?')) return;
-
-    this.jobsService.delete(this.selectedId).subscribe({
-        next: () => {
-        this.backToList();
-        this.load();
-        },
-        error: (e) => {
-        console.error('Delete failed', e);
-        alert('Delete failed');
-        }
+    this.jobsService.update(sj.id, payload).subscribe({
+      next: () => {
+        this.showModal = false;
+        this.loadProjectJobs(sp.id);
+        this.backToProjectJobs();
+      },
+      error: (e) => console.error('Update job failed', e),
     });
-    }
+  }
 }
